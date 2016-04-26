@@ -1,5 +1,7 @@
 package com.cqupt.jobclient.utils;
 
+import android.content.Context;
+import android.graphics.Bitmap;
 import android.text.format.Time;
 import android.util.Log;
 
@@ -16,7 +18,11 @@ import com.cqupt.jobclient.model.MessageItemNY;
 import com.cqupt.jobclient.model.MessageItemSC;
 import com.cqupt.jobclient.model.MessageItemXD;
 import com.cqupt.jobclient.model.MessageItemXDFirst;
+import com.cqupt.jobclient.model.NewsPicture;
+import com.nostra13.universalimageloader.core.DisplayImageOptions;
+import com.nostra13.universalimageloader.core.ImageLoader;
 
+import org.apache.http.util.ByteArrayBuffer;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -25,15 +31,28 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.MatchResult;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Created by Administrator on 2016/3/19.
  */
 public class GetData {
-//    unicode转化为中文
+    //    unicode转化为中文
     public static String decodeUnicode(String theString) {
 
         char aChar;
@@ -42,7 +61,7 @@ public class GetData {
 
         StringBuffer outBuffer = new StringBuffer(len);
 
-        for (int x = 0; x < len;) {
+        for (int x = 0; x < len; ) {
 
             aChar = theString.charAt(x++);
 
@@ -131,11 +150,11 @@ public class GetData {
 
     }
 
-    public static  ArrayList<MessageItemCQUPT> getMessageItemCQUT(String date) {
+    public static ArrayList<MessageItemCQUPT> getMessageItemCQUT(String date) {
         String CQUPTURL = "";
         ArrayList<MessageItemCQUPT> messageItemCQUPTArrayList = null;
         MessageItemCQUPT messageItemCQUPT = null;
-        CQUPTURL = "http://job.cqupt.edu.cn/main/getClnd/"+date;
+        CQUPTURL = "http://job.cqupt.edu.cn/main/getClnd/" + date;
 //        CQUPTURL = "http://job.cqupt.edu.cn/main/jobClnd/2016-04";
         try {
             Document document = Jsoup.connect(CQUPTURL).timeout(5000).get();
@@ -162,9 +181,9 @@ public class GetData {
                             String classroom = jsonObject_details.getString("classroom");
                             String startTime = jsonObject_details.getString("startTime");
                             String num = "";
-                            if(Integer.parseInt(jsonObject_details.getString("num"))==0){
+                            if (Integer.parseInt(jsonObject_details.getString("num")) == 0) {
                                 num = "需求人数：待定";
-                            }else{
+                            } else {
                                 num = "需求人数：" + jsonObject_details.getString("num");
                             }
                             messageItemCQUPT.setMessageTitle(title);
@@ -173,7 +192,7 @@ public class GetData {
                             messageItemCQUPT.setMessageUrl("http://job.cqupt.edu.cn/main/rec/" + id + "/");
                             messageItemCQUPT.setMessageNeedNum(num);
                             messageItemCQUPT.setMessageViewTime(scan);
-                            switch (Integer.parseInt(target)){
+                            switch (Integer.parseInt(target)) {
                                 case 1:
                                     messageItemCQUPT.setMessageNeedType("招聘类别：职员");
                                     break;
@@ -197,23 +216,24 @@ public class GetData {
         }
         return messageItemCQUPTArrayList;
     }
+
     public static ArrayList<MessageItemSC> getMessageItemSC(int page) {
         String SCURL = "";
         ArrayList<MessageItemSC> messageItemSCList = null;
         SCURL = "http://jy.scu.edu.cn/jiuye/news.php?sid=&start=" + page * 22 + "&type_id=4";
-        if(!NetWorkUtil.isNetWorkConnected(app.getContext())){
+        if (!NetWorkUtil.isNetWorkConnected(app.getContext())) {
             return null;
         }
         try {
             Document doc = Jsoup.connect(SCURL).timeout(5000).get();
 //            Log.e("初步抓取网页源码", doc.toString());
-            if(doc!=null) {
+            if (doc != null) {
                 Elements elements_messageSC = doc.select("td[valign=\"top\"]");
 //                Log.e("抓取内容成功",elements_messageSC.get(3).toString());
                 messageItemSCList = new ArrayList<>();
                 Elements elements_messageSCList = elements_messageSC.get(3).getElementsByClass("news");
                 MessageItemSC messageItemSC = null;
-                for(Element element:elements_messageSCList) {
+                for (Element element : elements_messageSCList) {
                     messageItemSC = new MessageItemSC();
                     messageItemSC.setMessageTitle(element.attr("title"));
                     messageItemSC.setMessageUrl("http://jy.scu.edu.cn/jiuye/" + element.attr("href"));
@@ -228,7 +248,7 @@ public class GetData {
     }
 
     public static ArrayList<MessageItemNY> getMessageItemNY(int page) {
-        String NYURL = "http://njupt.91job.gov.cn/teachin/index?page=" + (page+1);
+        String NYURL = "http://njupt.91job.gov.cn/teachin/index?page=" + (page + 1);
 //        Log.e("抓取网址",NYURL);
         ArrayList<MessageItemNY> messageItemNYList = null;
         MessageItemNY messageItemNY = null;
@@ -242,33 +262,33 @@ public class GetData {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        if(document==null) {
-                return null;
-            }
+        if (document == null) {
+            return null;
+        }
 //            Elements elements_NY = document.getElementsByAttributeValue("class", "span1");
 //            Elements elements_NY = document.getElementsByAttributeValueContaining("class","teachinList");
 //            Elements elements_NY = document.getElementsByClass("span1");
         //此处电脑网页端访问与手机客户端访问源码不同
         Elements elements_NY = document.getElementsByClass("list-group-item");
         messageItemNYList = new ArrayList<>();
-            for(Element element_NY:elements_NY) {
-                messageItemNY = new MessageItemNY();
-                String title = element_NY.getElementsByTag("h2").get(0).text();
-                messageItemNY.setMessageTitle(title);
-                String url = "http://njupt.91job.gov.cn"+element_NY.getElementsByTag("a").get(0).attr("href");
-                messageItemNY.setMessageUrl(url);
-                String place = element_NY.getElementsByClass("text-default").get(0).text();
-                messageItemNY.setMessagePlace(place);
-                String time = element_NY.getElementsByClass("text-default").get(1).text();
-                messageItemNY.setMessageTime(time);
-                messageItemNYList.add(messageItemNY);
-            }
+        for (Element element_NY : elements_NY) {
+            messageItemNY = new MessageItemNY();
+            String title = element_NY.getElementsByTag("h2").get(0).text();
+            messageItemNY.setMessageTitle(title);
+            String url = "http://njupt.91job.gov.cn" + element_NY.getElementsByTag("a").get(0).attr("href");
+            messageItemNY.setMessageUrl(url);
+            String place = element_NY.getElementsByClass("text-default").get(0).text();
+            messageItemNY.setMessagePlace(place);
+            String time = element_NY.getElementsByClass("text-default").get(1).text();
+            messageItemNY.setMessageTime(time);
+            messageItemNYList.add(messageItemNY);
+        }
 
         return messageItemNYList;
     }
 
     public static ArrayList<MessageItemXD> getMessageItemXD(int pageLoad) {
-        String XDURL = "http://job.xidian.edu.cn/html/zpxx/jobs/list_3_"+(pageLoad+1)+".html";
+        String XDURL = "http://job.xidian.edu.cn/html/zpxx/jobs/list_3_" + (pageLoad + 1) + ".html";
         ArrayList<MessageItemXD> messageItemXDList = null;
         MessageItemXD messageItemXD = null;
         Document document = null;
@@ -277,7 +297,7 @@ public class GetData {
         }
         try {
             document = Jsoup.connect(XDURL).timeout(5000).get();
-            if(document==null) {
+            if (document == null) {
                 return null;
             }
 
@@ -288,17 +308,17 @@ public class GetData {
             //添加南部校区招聘会
             messageItemXD = new MessageItemXD();
             messageItemXD.setMessageTitle("南校区招聘会安排");
-            Time time=new Time();
+            Time time = new Time();
             time.setToNow();
-            String curTime = "发布时间："+time.year + "年" + (time.month+1) + "月" + time.monthDay + "日";
+            String curTime = "发布时间：" + time.year + "年" + (time.month + 1) + "月" + time.monthDay + "日";
             messageItemXD.setMessagePostTime(curTime);
             messageItemXD.setMessageUrl("http://job.xidian.edu.cn/html/zpxx/nxqzph/");
             messageItemXDList.add(messageItemXD);
-            for(Element element_XD:elements_XD) {
+            for (Element element_XD : elements_XD) {
                 messageItemXD = new MessageItemXD();
-                String postTime = "发布时间："+element_XD.getElementsByTag("span").get(0).text();
+                String postTime = "发布时间：" + element_XD.getElementsByTag("span").get(0).text();
                 String title = element_XD.getElementsByTag("a").get(0).text();
-                String url = "http://job.xidian.edu.cn"+element_XD.getElementsByTag("a").get(0).attr("href");
+                String url = "http://job.xidian.edu.cn" + element_XD.getElementsByTag("a").get(0).attr("href");
 //                Log.e("postTime",postTime);
 //                Log.e("title",title);
 //                Log.e("url",url);
@@ -311,33 +331,35 @@ public class GetData {
             e.printStackTrace();
         }
         return messageItemXDList;
-    };
+    }
+
+    ;
 
     public static ArrayList<MessageItemHK> getMessageItemHK(int pageLoad) {
         ArrayList<MessageItemHK> messageItemHKList = null;
         MessageItemHK messageItemHK = null;
-        String HKURL = "http://job.hust.edu.cn/show/recruitnews/jobnewslist.htm?page="+(pageLoad+1);
+        String HKURL = "http://job.hust.edu.cn/show/recruitnews/jobnewslist.htm?page=" + (pageLoad + 1);
         Document document = null;
-        if(!NetWorkUtil.isNetWorkConnected(app.getContext())) {
+        if (!NetWorkUtil.isNetWorkConnected(app.getContext())) {
             return null;
         }
         try {
             document = Jsoup.connect(HKURL).timeout(5000).get();
-            if(document==null) {
+            if (document == null) {
                 return null;
             }
             Elements elements_HK = document.getElementsByClass("even");
-            if(elements_HK.size()<=0) {
+            if (elements_HK.size() <= 0) {
                 return null;
             }
             messageItemHKList = new ArrayList<>();
-            for(Element element_HK:elements_HK) {
+            for (Element element_HK : elements_HK) {
                 messageItemHK = new MessageItemHK();
-                String url = "http://job.hust.edu.cn/show"+
+                String url = "http://job.hust.edu.cn/show" +
                         element_HK.getElementsByTag("a").get(0).attr("href").substring(2);
                 String title = element_HK.getElementsByTag("a").get(0).text();
-                String postTime ="发布时间："+ element_HK.getElementsByTag("td").get(1).text();
-                String viewNum = "浏览次数："+element_HK.getElementsByTag("td").get(2).text();
+                String postTime = "发布时间：" + element_HK.getElementsByTag("td").get(1).text();
+                String viewNum = "浏览次数：" + element_HK.getElementsByTag("td").get(2).text();
 //                Log.e("抓取数据",pageLoad+url+title+postTime+viewNum);
                 messageItemHK.setMessageTitle(title);
                 messageItemHK.setMessageUrl(url);
@@ -356,8 +378,8 @@ public class GetData {
         DetailsArticleCQUPT detailsArticleCQUPT = null;
         Document document = null;
         try {
-            document = Jsoup.parse(new URL(url),5000);
-            if(document==null) {
+            document = Jsoup.parse(new URL(url), 5000);
+            if (document == null) {
                 return null;
             }
             detailsArticleCQUPTArrayList = new ArrayList<>();
@@ -370,23 +392,23 @@ public class GetData {
 
             Element element = document.getElementsByClass("passage_3").get(0);
             Elements elements_p = element.getElementsByTag("p");
-            for(Element element_p:elements_p) {
+            for (Element element_p : elements_p) {
                 detailsArticleCQUPT = new DetailsArticleCQUPT();
-                String text = element_p.text();
+                String text = "     " + element_p.text();
                 detailsArticleCQUPT.setText(text);
                 detailsArticleCQUPT.setType(2);
                 detailsArticleCQUPTArrayList.add(detailsArticleCQUPT);
             }
 
             Element element_doc = element.getElementsByTag("div").get(1).getElementsByTag("li").get(0);
-            String document_text = "附件："+element_doc.text();
+            String document_text = "附件：" + element_doc.text();
             String document_url = "";
             Elements elements_a = element_doc.getElementsByTag("a");
-            if(elements_a.size()>0) {
+            if (elements_a.size() > 0) {
                 Element element_a = elements_a.get(0);
-                document_url = "http://job.cqupt.edu.cn"+element_a.attr("href");
+                document_url = "http://job.cqupt.edu.cn" + element_a.attr("href");
             }
-            Log.e("详细网址",document_url);
+//            Log.e("详细网址",document_url);
             DocumentItem documentItem = new DocumentItem();
             documentItem.setDocument(document_text);
             documentItem.setDocumentUrl(document_url);
@@ -408,7 +430,7 @@ public class GetData {
         Document document = null;
         try {
             document = Jsoup.connect(url).timeout(5000).get();
-            if(document ==null) {
+            if (document == null) {
                 return null;
             }
 //            Element element = document.select
@@ -431,12 +453,12 @@ public class GetData {
             detailsArticleSCList.add(detailsArticleSC);
 
             Element element_recruit = element.select("font[color=\"red\"]").get(0);
-            if(element_recruit.text().length()>0){
+            if (element_recruit.text().length() > 0) {
                 detailsArticleSC = new DetailsArticleSC();
                 String recruit = element_recruit.text();
                 int timeNum = recruit.indexOf(" ");
                 String time = recruit.substring(0, timeNum);
-                String place = recruit.substring(timeNum+1);
+                String place = recruit.substring(timeNum + 1);
                 String finalRecruit = time + "\n" + place;
                 detailsArticleSC.setRecruit(finalRecruit);
                 detailsArticleSC.setType(4);
@@ -444,8 +466,8 @@ public class GetData {
             }
 
             Elements elements_article = element.getElementsByTag("p");
-            for(Element element_article:elements_article){
-                if(element_article.select("p[style=\"TEXT-ALIGN: center; LINE-HEIGHT: 150%\"]").size()>0) {
+            for (Element element_article : elements_article) {
+                if (element_article.select("p[style=\"TEXT-ALIGN: center; LINE-HEIGHT: 150%\"]").size() > 0) {
                     detailsArticleSC = new DetailsArticleSC();
                     String title = element_article.select
                             ("p[style=\"TEXT-ALIGN: center; LINE-HEIGHT: 150%\"]").get(0).text();
@@ -453,9 +475,9 @@ public class GetData {
                     detailsArticleSC.setType(2);
 //                    Log.e("抓取标题", title);
                     detailsArticleSCList.add(detailsArticleSC);
-                }else {
+                } else {
                     detailsArticleSC = new DetailsArticleSC();
-                    String text = "  "+element_article.text();
+                    String text = "     " + element_article.text();
                     detailsArticleSC.setText(text);
                     detailsArticleSC.setType(3);
 //                    Log.e("抓取正文",text);
@@ -476,16 +498,16 @@ public class GetData {
         ArrayList<DetailsArticleNY> detailsArticleNYs = null;
         DetailsArticleNY detailsArticleNY = null;
         Document document = null;
-        if(!NetWorkUtil.isNetWorkConnected(app.getContext())) {
+        if (!NetWorkUtil.isNetWorkConnected(app.getContext())) {
             return null;
         }
         try {
             document = Jsoup.connect(url).timeout(5000).get();
-            if(document==null) {
+            if (document == null) {
                 return null;
             }
-            Log.e("url", url);
-            Log.e("document",document.toString());
+//            Log.e("url", url);
+//            Log.e("document",document.toString());
 //            Element element = document.getElementsByClass("container").get(0);
             detailsArticleNYs = new ArrayList<>();
 //            Log.e("element", element.toString());
@@ -493,7 +515,7 @@ public class GetData {
             Element element_details = document.getElementsByClass("css-header").get(0);
             String title = element_details.getElementsByTag("h3").get(0)
                     .text();
-            Log.e("title", title);
+//            Log.e("title", title);
             detailsArticleNY = new DetailsArticleNY();
             detailsArticleNY.setType(0);
             detailsArticleNY.setTitle(title);
@@ -501,21 +523,21 @@ public class GetData {
 
             Elements elements_dt = element_details.getElementsByTag("dt");
             Elements elements_dd = element_details.getElementsByTag("dd");
-            if(elements_dd.size()!=elements_dt.size()) {
+            if (elements_dd.size() != elements_dt.size()) {
                 return null;
             }
-            for(int i =0;i<elements_dt.size();i++){
-                String text = elements_dt.get(i).text()+elements_dd.get(i).text();
-                Log.e("text", text);
+            for (int i = 0; i < elements_dt.size(); i++) {
+                String text = "    " + elements_dt.get(i).text() + elements_dd.get(i).text();
+//                Log.e("text", text);
                 detailsArticleNY = new DetailsArticleNY();
                 detailsArticleNY.setType(1);
                 detailsArticleNY.setText(text);
                 detailsArticleNYs.add(detailsArticleNY);
             }
             Elements elements_text_p = document.getElementsByClass("css-conbox").get(0).getElementsByTag("p");
-            for(Element element_text_p:elements_text_p) {
-                String text = element_text_p.text();
-                Log.e("text", text);
+            for (Element element_text_p : elements_text_p) {
+                String text = "    " + element_text_p.text();
+//                Log.e("text", text);
                 detailsArticleNY = new DetailsArticleNY();
                 detailsArticleNY.setType(2);
                 detailsArticleNY.setText(text);
@@ -532,13 +554,13 @@ public class GetData {
         DetailsArticleXD detailsArticleXD = null;
         Document document = null;
         Document document_num = null;
-        if(!NetWorkUtil.isNetWorkConnected(app.getContext())) {
+        if (!NetWorkUtil.isNetWorkConnected(app.getContext())) {
             return null;
         }
         try {
             document = Jsoup.connect(url).get();
             Elements element_mains = document.getElementsByClass("main");
-            if(element_mains!=null&&element_mains.size()>0) {
+            if (element_mains != null && element_mains.size() > 0) {
                 detailsArticleXDs = new ArrayList<>();
                 Element element_main = element_mains.get(0);
                 Element element_arcTitle = element_main.getElementsByClass("arcTitle").get(0);
@@ -552,7 +574,7 @@ public class GetData {
                 Element element_arcInfo = element_main.getElementsByClass("arcInfo").get(0);
                 detailsArticleXD = new DetailsArticleXD();
                 String info = element_arcInfo.text();
-                info = info.substring(0,21);
+                info = info.substring(0, 21);
                 detailsArticleXD.setTime(info);
 //                Log.e("arcInfo", detailsArticleXD.getTime());
                 detailsArticleXD.setType(1);
@@ -560,11 +582,14 @@ public class GetData {
 
                 Elements elements_arcContents = element_main.getElementsByClass("arcContent").get(0)
                         .getElementsByTag("p");
-                if(elements_arcContents.size()>0){
-                    for(Element element_arcContent:elements_arcContents) {
+                if (elements_arcContents.size() > 0) {
+                    Element element_arcContent = null;
+//                    去除最后干扰数据
+                    for (int i = 0; i < elements_arcContents.size() - 2; i++) {
+                        element_arcContent = elements_arcContents.get(i);
                         detailsArticleXD = new DetailsArticleXD();
 //                        Log.e("arcContent", element_arcContent.text());
-                        detailsArticleXD.setText(element_arcContent.text());
+                        detailsArticleXD.setText("    " + element_arcContent.text());
                         detailsArticleXD.setType(2);
                         detailsArticleXDs.add(detailsArticleXD);
                     }
@@ -578,22 +603,23 @@ public class GetData {
         }
         return detailsArticleXDs;
     }
+
     public static ArrayList<DetailsArticleHK> getDetailsArticleHK(String url) {
         ArrayList<DetailsArticleHK> detailsArticleHKs = null;
         DetailsArticleHK detailsArticleHK = null;
         Document document = null;
-        if(!NetWorkUtil.isNetWorkConnected(app.getContext())) {
+        if (!NetWorkUtil.isNetWorkConnected(app.getContext())) {
             return null;
         }
         try {
-            Log.e("开始抓取", url);
+//            Log.e("开始抓取", url);
             document = Jsoup.connect(url).get();
             Element element_detail = document.getElementById("detail");
             detailsArticleHKs = new ArrayList<>();
 
             Element element_content_title = element_detail.getElementById("content_title");
             detailsArticleHK = new DetailsArticleHK();
-            Log.e("title", element_content_title.text());
+//            Log.e("title", element_content_title.text());
             detailsArticleHK.setTitle(element_content_title.text());
             detailsArticleHK.setType(0);
             detailsArticleHKs.add(detailsArticleHK);
@@ -602,16 +628,16 @@ public class GetData {
             detailsArticleHK = new DetailsArticleHK();
             detailsArticleHK.setTime(element_scancount.text());
             detailsArticleHK.setType(1);
-            Log.e("scancount", detailsArticleHK.getTime());
+//            Log.e("scancount", detailsArticleHK.getTime());
             detailsArticleHKs.add(detailsArticleHK);
 
             Elements elements_content = element_detail.getElementsByTag("p");
             if (elements_content.size() > 0) {
                 for (Element element_content : elements_content) {
                     detailsArticleHK = new DetailsArticleHK();
-                    detailsArticleHK.setText(element_content.text());
+                    detailsArticleHK.setText("    " + element_content.text());
                     detailsArticleHK.setType(2);
-                    Log.e("p", detailsArticleHK.getText());
+//                    Log.e("p", detailsArticleHK.getText());
                     detailsArticleHKs.add(detailsArticleHK);
                 }
             }
@@ -627,13 +653,13 @@ public class GetData {
         ArrayList<MessageItemXDFirst> messageItemXDFirsts = null;
         MessageItemXDFirst messageItemXDFirst = null;
         Document document = null;
-        if(!NetWorkUtil.isNetWorkConnected(app.getContext())) {
+        if (!NetWorkUtil.isNetWorkConnected(app.getContext())) {
             return null;
         }
         try {
             document = Jsoup.connect(url).get();
             Elements element_zphTables = document.getElementsByClass("zphTable");
-            if(element_zphTables.size()>0) {
+            if (element_zphTables.size() > 0) {
                 Element element_zphTable = element_zphTables.get(0);
                 Elements elements_trs = element_zphTable.getElementsByTag("tr");
                 messageItemXDFirsts = new ArrayList<>();
@@ -641,14 +667,14 @@ public class GetData {
                 int num = elements_trs.size();
                 Elements element_tds = null;
                 Element element_td = null;
-                for(index = 1;index<num;index++) {
+                for (index = 1; index < num; index++) {
                     element_tds = elements_trs.get(index).getElementsByTag("td");
                     messageItemXDFirst = new MessageItemXDFirst();
                     String title = element_tds.get(3).text();
                     String time = "时间：20" + element_tds.get(0).text() + element_tds.get(1).text();
-                    String place = "地点："+element_tds.get(2).text();
-                    String messageUrl = "http://job.xidian.edu.cn"+element_tds.get(3).getElementsByTag("a").get(0).attr("href");
-                    Log.e("message", title + time + place + messageUrl);
+                    String place = "地点：" + element_tds.get(2).text();
+                    String messageUrl = "http://job.xidian.edu.cn" + element_tds.get(3).getElementsByTag("a").get(0).attr("href");
+//                    Log.e("message", title + time + place + messageUrl);
                     messageItemXDFirst.setMessageTitle(title);
                     messageItemXDFirst.setMessageUrl(messageUrl);
                     messageItemXDFirst.setMessagePlace(place);
@@ -661,4 +687,245 @@ public class GetData {
         }
         return messageItemXDFirsts;
     }
+
+
+    public static String PICTURE_URL = "http://www.cqupt.edu.cn/cqupt/dynamic/imgs.js";
+
+    /*
+       * 抓取viewpager*/
+    public static ArrayList<NewsPicture> getNewsPicture() {
+        ArrayList<NewsPicture> list = null;
+        NewsPicture newsPicture;
+        String htmlStr = "";
+        JSONObject jsonObject;
+        try {
+//注意此处jsoup和前两种方法都无法获取源码，
+            htmlStr = getHtmlFromURLLine(PICTURE_URL);
+//            Log.e("htmlstr", htmlStr);//其实不能完全打印
+            if (htmlStr != null) {
+                list = new ArrayList<NewsPicture>();
+//                Pattern p = Pattern.compile("cnews_details_title=\"(.*?)\" href=\"(.*?)\".*?363");
+                Pattern p = Pattern.compile("_banner1 = (.*?);");
+//        Pattern p = Pattern.compile("class=\"link_title\"><a href=\"(.*?)\">");
+                Matcher m = p.matcher(htmlStr);
+
+                while (m.find()) {
+                    MatchResult mr = m.toMatchResult();
+//                    Log.e("正则表达式输出", mr.group(1));
+                    JSONArray jsonArray = new JSONArray(mr.group(1));
+                    for (int i = 0; i < jsonArray.length(); i++) {
+                        jsonObject = jsonArray.getJSONObject(i);
+                        newsPicture = new NewsPicture();
+//                        Log.e("imgaddr", "http://www.cqupt.edu.cn" + jsonObject.get("imgaddr").toString());
+                        newsPicture.setImageUrl("http://www.cqupt.edu.cn" + jsonObject.get("imgaddr").toString());
+                        newsPicture.setNewsUrl(jsonObject.get("linkaddr").toString());
+                        list.add(newsPicture);
+                    }
+                }
+            }
+            return list;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+    /**
+     * 清除APP数据
+     */
+    public static void clearData(Context context) {
+
+        ImageLoader imageLoader = ImageLoader.getInstance();
+        DisplayImageOptions options = new DisplayImageOptions.Builder()
+                .cacheInMemory(true)
+                .cacheOnDisk(true)
+                .bitmapConfig(Bitmap.Config.RGB_565)
+                .resetViewBeforeLoading(true)
+                .build();
+        imageLoader.clearDiskCache();
+        imageLoader.clearMemoryCache();
+//      final String path = "/data/data/" + getPackageName().toString();
+        final String path = context.getFilesDir().getParent();
+
+        //清空配置文件目录shared_prefs；
+        File file_xml = new File(path + "/shared_prefs");
+        if (file_xml.exists()) {
+            File[] files = file_xml.listFiles();
+            for (int i = 0; i < files.length; i++) {
+                files[i].delete();
+            }
+        }
+        //jobClient清空
+        File file_shot = new File(context.getFilesDir().getPath()+"/jobClient");
+        if (file_shot.exists()) {
+            File[] files = file_shot.listFiles();
+            for (int i = 0; i < files.length; i++) {
+                Log.e("filesDir目录",files[i]+"");
+                files[i].delete();
+            }
+        }
+        //清空缓存目录；
+        File file_cache = context.getCacheDir();
+        if (file_cache.exists()) {
+            File[] files = file_cache.listFiles();
+            for (int i = 0; i < files.length; i++) {
+                files[i].delete();
+            }
+        }
+
+        //清空file目录；
+        File file_file = new File(path + "/files");;
+        if (file_file.exists()) {
+            File[] files = file_file.listFiles();
+            for (int i = 0; i < files.length; i++) {
+                files[i].delete();
+            }
+        }
+
+        //清空数据库目录；
+        File file_db = new File(path + "/databases");
+        if (file_db.exists()) {
+            File[] files = file_db.listFiles();
+            for (int i = 0; i < files.length; i++) {
+                files[i].delete();
+            }
+        }
+//        //这里可以重启你的应用程序，我的app中有service，所以我只要杀死进程就自动重启了。
+//        android.os.Process.killProcess(android.os.Process.myPid());
+    }
+    public static String getHtmlFromURLLine(String urlString) {
+        String codeString = "";
+        try {
+            URL uri = new URL(urlString);
+            InputStream is = uri.openStream();
+            BufferedReader bis = new BufferedReader(new InputStreamReader(is));
+            String line = null;
+            while ((line = bis.readLine()) != null) {
+                codeString = codeString + line;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return codeString;
+    }
+    public String getHtmlFromURLALL(String urlString) {
+        String htmlStr = "";
+        try {
+            URL uri = new URL(urlString);
+            URLConnection ucon = uri.openConnection();
+            InputStream is = ucon.getInputStream();
+            BufferedInputStream bis = new BufferedInputStream(is);
+            ByteArrayBuffer baf = new ByteArrayBuffer(100);
+            int current = 0;
+            while ((current = bis.read()) != -1) {
+                baf.append((byte) current);
+            }
+            htmlStr = new String(baf.toByteArray(), "utf-8");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return htmlStr;
+    }
+    public String  getHtmlFromURL2(String urlString) {
+        String htmlStr = "";
+        try {
+            URL url = new URL(urlString);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setDoInput(true);
+            conn.connect();
+            InputStream is = conn.getInputStream();
+            BufferedInputStream bis = new BufferedInputStream(is);
+            ByteArrayBuffer baf = new ByteArrayBuffer(100);
+            int current = 0;
+            while ((current = bis.read()) != -1) {
+                baf.append((byte) current);
+            }
+            is.close();
+            conn.disconnect();
+            htmlStr = new String(baf.toByteArray(), "utf-8");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return htmlStr;
+    }
+    public static String getCodeString(String url) {
+        StringBuffer urlString = null;//只有StringBuffer可以使用append
+        InputStream inputStream = null;
+        String line = "";
+        try {
+
+            URL url1 = new URL(url);
+            try {
+                HttpURLConnection urlConnection = (HttpURLConnection) url1.openConnection();
+                urlConnection.setRequestMethod("GET");
+                urlConnection.setConnectTimeout(5000);
+                urlConnection.setDoInput(true);
+                urlConnection.setDoOutput(true);
+                inputStream = urlConnection.getInputStream();
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
+//                Log.e("bufferedReader", bufferedReader + "");
+                while ((line = bufferedReader.readLine()) != null) {
+                    urlString.append(line);
+                }
+//                Log.e("urlString", urlString + "");
+                inputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+
+        return urlString.toString();
+    }
+    //通过URL获取源码标准代码
+
+    public static String doGet(String urlStr) throws Exception {
+        if (urlStr == "") {
+            return null;
+        }
+        URL url;
+        HttpURLConnection conn = null;
+        InputStream is = null;
+        ByteArrayOutputStream baos = null;
+        try {
+            url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setReadTimeout(2000);
+            conn.setConnectTimeout(2000);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("accept", "*/*");
+            conn.setRequestProperty("connection", "Keep-Alive");
+            is = conn.getInputStream();
+            baos = new ByteArrayOutputStream();
+            int len = -1;
+            byte[] buf = new byte[128];
+
+            while ((len = is.read(buf)) != -1) {
+                baos.write(buf, 0, len);
+            }
+            baos.flush();
+            return baos.toString();
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+        } finally {
+            try {
+                if (is != null)
+                    is.close();
+            } catch (IOException e) {
+            }
+            try {
+                if (baos != null)
+                    baos.close();
+            } catch (IOException e) {
+            }
+            conn.disconnect();
+        }
+
+        return null;
+    }
+
 }

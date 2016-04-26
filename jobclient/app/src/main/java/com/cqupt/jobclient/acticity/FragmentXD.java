@@ -9,6 +9,7 @@ import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -19,6 +20,7 @@ import com.cqupt.jobclient.R;
 import com.cqupt.jobclient.adapter.RecyclerViewNYAdapter;
 import com.cqupt.jobclient.adapter.RecyclerViewXDAdapter;
 import com.cqupt.jobclient.model.MessageItemXD;
+import com.cqupt.jobclient.utils.DB.DataBaseTool_XD;
 import com.cqupt.jobclient.utils.GetData;
 import com.cqupt.jobclient.utils.NetWorkUtil;
 import com.pnikosis.materialishprogress.ProgressWheel;
@@ -40,6 +42,7 @@ public class FragmentXD  extends Fragment {
     private RecyclerViewXDAdapter recyclerViewXDAdapter;
     private ArrayList<MessageItemXD> messageItemXDList;
     private ProgressWheel progressWheel;
+    private DataBaseTool_XD dataBaseTool_xd;
     @Override
     public void setUserVisibleHint(boolean isVisibleToUser) {
         super.setUserVisibleHint(isVisibleToUser);
@@ -49,6 +52,20 @@ public class FragmentXD  extends Fragment {
                 pageLoad = 0;
                 new XDAsyncTask().execute(String.valueOf(pageLoad));
                 hasLoad = true;
+            }else {
+                if(!hasLoad){
+                    messageItemXDList = dataBaseTool_xd.selectAll();
+//                注意此处页面已经初始化，不会出现recyclerView空值的问题，由于先初始化假如在initView中适配
+//                会出现messageItemSCList空值的问题
+                    if(messageItemXDList!=null) {
+                        recyclerViewXDAdapter = new RecyclerViewXDAdapter(getActivity(), messageItemXDList);
+                        recyclerViewXD.setAdapter(recyclerViewXDAdapter);
+                        showProgressWheel(false);
+                    }
+//                Toast.makeText(app.getContext(), "加载缓存数据", Toast.LENGTH_SHORT).show();
+                    hasLoad = true;
+                }
+
             }
         }else {
             isVisible = false;
@@ -58,6 +75,7 @@ public class FragmentXD  extends Fragment {
     @Override
     public void onAttach(Activity activity) {
         super.onAttach(activity);
+        dataBaseTool_xd = new DataBaseTool_XD(app.getContext());
     }
 
     @Nullable
@@ -88,6 +106,7 @@ public class FragmentXD  extends Fragment {
                     pageLoad = 0;
                     new XDAsyncTask().execute(String.valueOf(pageLoad));
                 } else {
+                    resetSwipeLayout();
                     Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
                 }
             }
@@ -131,10 +150,15 @@ public class FragmentXD  extends Fragment {
                         if (layoutManager instanceof LinearLayoutManager) {
                             int lastitem = linearLayoutManager.findLastCompletelyVisibleItemPosition();
                             if (recyclerView.getAdapter().getItemCount() == lastitem + 1) {
-                                pageLoad++;
-                                swipeRefreshLayoutXD.setRefreshing(true);
-                                swipeRefreshLayoutXD.setEnabled(false);
-                                new XDAsyncTask().execute(String.valueOf(pageLoad));
+                                if(NetWorkUtil.isNetWorkConnected(app.getContext())){
+                                    pageLoad++;
+                                    swipeRefreshLayoutXD.setRefreshing(true);
+                                    swipeRefreshLayoutXD.setEnabled(false);
+                                    new XDAsyncTask().execute(String.valueOf(pageLoad));
+                                }else {
+                                    Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
+                                }
+
                             }
                         }
                     }
@@ -145,6 +169,14 @@ public class FragmentXD  extends Fragment {
             }
         });
     }
+
+    private void resetSwipeLayout(){
+        if(swipeRefreshLayoutXD.isRefreshing()){
+            swipeRefreshLayoutXD.setRefreshing(false);
+        }
+        swipeRefreshLayoutXD.setEnabled(true);
+    }
+
     //    进度条操作
     private void showProgressWheel(boolean visible) {
         progressWheel.setBarColor(getResources().getColor(R.color.dark_red));
@@ -176,6 +208,8 @@ public class FragmentXD  extends Fragment {
             super.onPostExecute(messageItemXDs);
             if(messageItemXDs==null||messageItemXDs.size()<=0){
                 Toast.makeText(app.getContext(), "数据加载失败", Toast.LENGTH_SHORT).show();
+                showProgressWheel(false);
+                resetSwipeLayout();
 //                待重新获取
                 return;
             }
@@ -183,8 +217,10 @@ public class FragmentXD  extends Fragment {
                 if(messageItemXDList!=null){
                     messageItemXDList.clear();
                 }
+                dataBaseTool_xd.clear();
                 messageItemXDList = new ArrayList<>();
                 messageItemXDList.addAll(messageItemXDs);
+                dataBaseTool_xd.addToDB(messageItemXDs);
                 recyclerViewXDAdapter = new RecyclerViewXDAdapter(getActivity(),messageItemXDList);
                 recyclerViewXD.setAdapter(recyclerViewXDAdapter);
                 if(recyclerViewXDAdapter.getItemCount()>0){
@@ -192,6 +228,7 @@ public class FragmentXD  extends Fragment {
                 }
             }else {
                 messageItemXDList.addAll(messageItemXDs);
+                dataBaseTool_xd.addToDB(messageItemXDs);
             }
             if(recyclerViewXDAdapter==null){
                 recyclerViewXDAdapter = new RecyclerViewXDAdapter(getActivity(),messageItemXDList);

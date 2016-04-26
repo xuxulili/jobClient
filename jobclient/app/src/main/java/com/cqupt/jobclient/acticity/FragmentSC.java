@@ -19,6 +19,7 @@ import android.widget.Toast;
 import com.cqupt.jobclient.R;
 import com.cqupt.jobclient.adapter.RecyclerViewSCAdapter;
 import com.cqupt.jobclient.model.MessageItemSC;
+import com.cqupt.jobclient.utils.DB.DataBaseTool_SC;
 import com.cqupt.jobclient.utils.GetData;
 import com.cqupt.jobclient.utils.NetWorkUtil;
 import com.pnikosis.materialishprogress.ProgressWheel;
@@ -41,6 +42,7 @@ public class FragmentSC  extends Fragment {
     private int pageLoad;
     private ProgressWheel progressWheel;
     private RecyclerViewSCAdapter recyclerViewSCAdapter;
+    private DataBaseTool_SC dataBaseTool_sc;
     @Override
     public void setUserVisibleHint(boolean isVisibleToUser) {
         super.setUserVisibleHint(isVisibleToUser);
@@ -51,6 +53,20 @@ public class FragmentSC  extends Fragment {
                 pageLoad = 0;
                 new SCAsyncTask().execute(String.valueOf(pageLoad));
                 hasLoad = true;
+            }else {
+                if(!hasLoad){
+                    messageItemSCList = dataBaseTool_sc.selectAll();
+//                注意此处页面已经初始化，不会出现recyclerView空值的问题，由于先初始化假如在initView中适配
+//                会出现messageItemSCList空值的问题
+                    if(messageItemSCList!=null) {
+                        recyclerViewSCAdapter = new RecyclerViewSCAdapter(getActivity(), messageItemSCList);
+                        recyclerViewSC.setAdapter(recyclerViewSCAdapter);
+                        showProgressWheel(false);
+                    }
+//                Toast.makeText(app.getContext(), "加载缓存数据", Toast.LENGTH_SHORT).show();
+                    hasLoad = true;
+                }
+
             }
         }else {
             isVisible = false;
@@ -60,6 +76,7 @@ public class FragmentSC  extends Fragment {
     @Override
     public void onAttach(Activity activity) {
         super.onAttach(activity);
+        dataBaseTool_sc = new DataBaseTool_SC(app.getContext());
     }
 
     @Override
@@ -95,6 +112,7 @@ public class FragmentSC  extends Fragment {
                     new SCAsyncTask().execute(String.valueOf(pageLoad));
                 } else {
                     Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
+                    resetSwipeLayout();
                 }
             }
         });
@@ -137,19 +155,23 @@ public class FragmentSC  extends Fragment {
                         if (layoutManager instanceof LinearLayoutManager) {
                             int lastitem = linearLayoutManager.findLastCompletelyVisibleItemPosition();
                             if (recyclerView.getAdapter().getItemCount() == lastitem + 1) {
-                                pageLoad++;
-                                swipeRefreshLayoutSC.setRefreshing(true);
-                                swipeRefreshLayoutSC.setEnabled(false);
-                                new SCAsyncTask().execute(String.valueOf(pageLoad));
+                                if (NetWorkUtil.isNetWorkConnected(app.getContext())) {
+                                    pageLoad++;
+                                    swipeRefreshLayoutSC.setRefreshing(true);
+                                    swipeRefreshLayoutSC.setEnabled(false);
+                                    new SCAsyncTask().execute(String.valueOf(pageLoad));
+                                } else {
+                                    Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
+                                }
                             }
                         }
                     }
-
                     lastdy = dy;
                 }
                 super.onScrolled(recyclerView, dx, dy);
             }
         });
+
     }
 //    进度条操作
     private void showProgressWheel(boolean visible) {
@@ -168,6 +190,12 @@ public class FragmentSC  extends Fragment {
             }, 500);
         }
     }
+    private void resetSwipeLayout(){
+        if(swipeRefreshLayoutSC.isRefreshing()){
+            swipeRefreshLayoutSC.setRefreshing(false);
+        }
+        swipeRefreshLayoutSC.setEnabled(true);
+    }
     class SCAsyncTask extends AsyncTask<String, Void, List<MessageItemSC>>{
         private ArrayList<MessageItemSC> messageItemSCs;
 
@@ -181,6 +209,8 @@ public class FragmentSC  extends Fragment {
             super.onPostExecute(messageItemSC);
             if(messageItemSC==null||messageItemSC.size()<=0){
                 Toast.makeText(app.getContext(), "数据加载失败", Toast.LENGTH_SHORT).show();
+                showProgressWheel(false);
+                resetSwipeLayout();
 //                待重新获取
                 return;
             }
@@ -188,8 +218,10 @@ public class FragmentSC  extends Fragment {
                 if(messageItemSCList!=null){
                     messageItemSCList.clear();//清除存储list后需要重新新建适配器对象 否则列表将更新为空白
                 }
+                dataBaseTool_sc.clear();
                 messageItemSCList = new ArrayList<>();
                 messageItemSCList.addAll(messageItemSC);
+                dataBaseTool_sc.addToDB(messageItemSC);
                 recyclerViewSCAdapter = new RecyclerViewSCAdapter(getActivity(),messageItemSCList);
                 recyclerViewSC.setAdapter(recyclerViewSCAdapter);
                 if(recyclerViewSCAdapter.getItemCount()>0){
@@ -197,6 +229,7 @@ public class FragmentSC  extends Fragment {
                 }
             }else {
                 messageItemSCList.addAll(messageItemSC);
+                dataBaseTool_sc.addToDB(messageItemSC);
             }
             if(recyclerViewSCAdapter==null){
                 recyclerViewSCAdapter = new RecyclerViewSCAdapter(getActivity(),messageItemSCList);

@@ -4,9 +4,9 @@
 
     <group android:checkableBehavior="single">
         <item
-            android:id="@+id/job"
+            android:id="@+id/job_experience"
             android:icon="@drawable/ic_event"
-            android:title="就业信息" />
+            android:title="面试经验" />
         <item
             android:id="@+id/useBook"
             android:icon="@drawable/ic_forum"
@@ -16,9 +16,9 @@
             android:icon="@drawable/ic_headset"
             android:title="关于" />
         <item
-            android:id="@+id/notify"
+            android:id="@+id/clear"
             android:icon="@android:drawable/ic_menu_myplaces"
-            android:title="桌面推送" />
+            android:title="清空缓存" />
 
 
     </group>

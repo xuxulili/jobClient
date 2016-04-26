@@ -1,0 +1,28 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.socks.jiandan.ui.FreshNewsDetailActivity">
+
+
+    <item android:id="@+id/action_share"
+        android:icon="@drawable/ic_share_white_16dp"
+        android:orderInCategory="100"
+        android:title="分享"
+        app:showAsAction="never"/>
+    <item android:id="@+id/action_copy"
+        android:icon="@drawable/ic_share_white_16dp"
+        android:orderInCategory="100"
+        android:title="复制文本"
+        app:showAsAction="never"/>
+    <item android:id="@+id/action_cut"
+        android:icon="@drawable/ic_share_white_16dp"
+        android:orderInCategory="100"
+        android:title="截屏"
+        app:showAsAction="never"/>
+    <!--<item android:id="@+id/action_picture"-->
+        <!--android:icon="@drawable/ic_menu_send"-->
+        <!--android:orderInCategory="100"-->
+        <!--android:title="鍥剧墖鍒嗕韩"-->
+        <!--app:showAsAction="never"/>-->
+
+</menu>

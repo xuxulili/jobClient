@@ -22,6 +22,9 @@ import com.cqupt.jobclient.adapter.RecyclerViewCQUPTAdapter;
 import com.cqupt.jobclient.adapter.RecyclerViewHKAdapter;
 import com.cqupt.jobclient.model.MessageItemCQUPT;
 import com.cqupt.jobclient.model.MessageItemHK;
+import com.cqupt.jobclient.model.NewsPicture;
+import com.cqupt.jobclient.utils.DB.CQUPT_DB;
+import com.cqupt.jobclient.utils.DB.DataBaseTool_CQUPT;
 import com.cqupt.jobclient.utils.GetData;
 import com.cqupt.jobclient.utils.NetWorkUtil;
 import com.pnikosis.materialishprogress.ProgressWheel;
@@ -46,24 +49,44 @@ public class FragmentCQUPT extends Fragment {
     private ProgressWheel progressWheel;
     private String curDate;
     private String dateRemain;
+    private DataBaseTool_CQUPT dataBaseTool_cqupt;
+    private boolean firstLoad;
+    private boolean isLoading;
+    private int hasLoadPicture;
+    private ArrayList<NewsPicture> newsPictureArrayList;
     @Override
     public void setUserVisibleHint(boolean isVisibleToUser) {
         super.setUserVisibleHint(isVisibleToUser);
         if(getUserVisibleHint()) {
+
             isVisible = true;
             if(NetWorkUtil.isNetWorkConnected(app.getContext())&&isVisible&&!hasLoad) {
                 curDate = getCurTime();
+                firstLoad = true;
                 new CQUPTAsyncTask().execute(curDate);
                 hasLoad = true;
+            }else {
+                if(!hasLoad){
+                    messageItemCQUPTList = dataBaseTool_cqupt.selectAll();
+                    hasLoad = true;
+                }
+//                Toast.makeText(app.getContext(), "加载缓存数据", Toast.LENGTH_SHORT).show();
+
             }
         }else {
             isVisible = false;
         }
     }
 
+    private OnLoadingListener onLoadingListener;
+
     @Override
     public void onAttach(Activity activity) {
         super.onAttach(activity);
+
+        onLoadingListener = (OnLoadingListener) activity;
+
+        dataBaseTool_cqupt = new DataBaseTool_CQUPT(app.getContext());
         SimpleDateFormat sDateFormat = new SimpleDateFormat("yyyy-MM-dd");
         String date = sDateFormat.format(new java.util.Date());
         dateRemain = date;
@@ -96,9 +119,12 @@ public class FragmentCQUPT extends Fragment {
             public void onRefresh() {
                 if (NetWorkUtil.isNetWorkConnected(app.getContext())) {
                     curDate = getCurTime();
+                    firstLoad = true;
+                    dateRemain = curDate;
                     new CQUPTAsyncTask().execute(curDate);
                 } else {
                     Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
+                    resetSwipeLayout();
                 }
             }
         });
@@ -141,10 +167,15 @@ public class FragmentCQUPT extends Fragment {
                         if (layoutManager instanceof LinearLayoutManager) {
                             int lastitem = linearLayoutManager.findLastCompletelyVisibleItemPosition();
                             if (recyclerView.getAdapter().getItemCount() == lastitem + 1) {
-                                String nextTime = getNextTime(dateRemain);
-                                swipeRefreshLayoutCQUPT.setRefreshing(true);
-                                swipeRefreshLayoutCQUPT.setEnabled(false);
-                                new CQUPTAsyncTask().execute(nextTime);
+                                if (NetWorkUtil.isNetWorkConnected(app.getContext())) {
+                                    String nextTime = getNextTime(dateRemain);
+                                    swipeRefreshLayoutCQUPT.setRefreshing(true);
+                                    swipeRefreshLayoutCQUPT.setEnabled(false);
+                                    new CQUPTAsyncTask().execute(nextTime);
+                                } else {
+                                    Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
+                                }
+
                             }
                         }
                     }
@@ -154,6 +185,12 @@ public class FragmentCQUPT extends Fragment {
                 super.onScrolled(recyclerView, dx, dy);
             }
         });
+//        用于无网络加载缓存数据
+        if(messageItemCQUPTList!=null){
+            recyclerViewCQUPTAdapter = new RecyclerViewCQUPTAdapter(getActivity(), messageItemCQUPTList);
+            recyclerViewCQUPT.setAdapter(recyclerViewCQUPTAdapter);
+            showProgressWheel(false);
+        }
     }
     //    进度条操作
     private void showProgressWheel(boolean visible) {
@@ -225,6 +262,10 @@ public class FragmentCQUPT extends Fragment {
         protected ArrayList<MessageItemCQUPT> doInBackground(String... strings) {
             messageItemCQUPTs = GetData.getMessageItemCQUT(strings[0]);
             date = strings[0];
+            if(hasLoadPicture==1) {
+                newsPictureArrayList = GetData.getNewsPicture();
+            }
+            hasLoadPicture ++;
             return messageItemCQUPTs;
         }
 
@@ -235,25 +276,36 @@ public class FragmentCQUPT extends Fragment {
                 Toast.makeText(app.getContext(), "无数据，请重新加载", Toast.LENGTH_SHORT).show();
                 resetSwipeLayout();
 //                待重新获取
-//                return;
+                return;
             }
 
-            if(date==getCurTime()){
+            if(firstLoad){
                 if(messageItemCQUPTList!=null){
                     messageItemCQUPTList.clear();
                 }
+//                清理数据库前加此句，有可能出现执行清空数据操作后，不存在这个表
+                dataBaseTool_cqupt = new DataBaseTool_CQUPT(app.getContext());
+                dataBaseTool_cqupt.clear();
                 messageItemCQUPTList = new ArrayList<>();
                 messageItemCQUPTList.addAll(messageItemCQUPTs);
+                dataBaseTool_cqupt.addToDB(messageItemCQUPTs);
+                //！！！注意当messageItemCQUPTList被清空一次后，需要重新创建适配器对象，否则即使messageItemCQUPTList
+                // 有数据，列表也更新为空，
+                recyclerViewCQUPTAdapter = new RecyclerViewCQUPTAdapter(getActivity(),messageItemCQUPTList);
+                recyclerViewCQUPT.setAdapter(recyclerViewCQUPTAdapter);
+                firstLoad = false;
 
             }else {
                 if(messageItemCQUPTList==null){
                     messageItemCQUPTList = new ArrayList<>();
                 }
                 messageItemCQUPTList.addAll(messageItemCQUPTs);
+                dataBaseTool_cqupt.addToDB(messageItemCQUPTs);
             }
             if(messageItemCQUPTList.size()<6) {
                 String getTime = getNextTime(dateRemain);
                 new CQUPTAsyncTask().execute(getTime);
+
             }else{
                 if(recyclerViewCQUPTAdapter == null) {
                     recyclerViewCQUPTAdapter = new RecyclerViewCQUPTAdapter(getActivity(),messageItemCQUPTList);
@@ -262,6 +314,9 @@ public class FragmentCQUPT extends Fragment {
                 recyclerViewCQUPTAdapter.notifyDataSetChanged();
                 showProgressWheel(false);
                 resetSwipeLayout();
+                if(hasLoadPicture==2){
+                    onLoadingListener.onLoad(newsPictureArrayList);
+                }
             }
         }
     }

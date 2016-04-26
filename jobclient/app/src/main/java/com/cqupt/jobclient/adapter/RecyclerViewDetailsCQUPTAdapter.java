@@ -1,15 +1,26 @@
 package com.cqupt.jobclient.adapter;
 
+import android.os.AsyncTask;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.cqupt.jobclient.R;
 import com.cqupt.jobclient.acticity.app;
 import com.cqupt.jobclient.model.DetailsArticleCQUPT;
+import com.cqupt.jobclient.utils.FileUtils;
+import com.cqupt.jobclient.utils.HttpDownloader;
+import com.lidroid.xutils.HttpUtils;
+import com.lidroid.xutils.exception.HttpException;
+import com.lidroid.xutils.http.HttpHandler;
+import com.lidroid.xutils.http.ResponseInfo;
+import com.lidroid.xutils.http.callback.RequestCallBack;
+import com.lidroid.xutils.http.client.HttpRequest;
 
+import java.io.File;
 import java.util.ArrayList;
 
 /**
@@ -19,6 +30,9 @@ public class RecyclerViewDetailsCQUPTAdapter extends RecyclerView.Adapter<Recycl
     private ArrayList<DetailsArticleCQUPT> detailsArticleCQUPTArrayList = null;
     private View view;
     private LayoutInflater inflater;
+    private String path = "jobClient/";
+    private String fileName = "";
+    private String url = "";
     public RecyclerViewDetailsCQUPTAdapter(ArrayList<DetailsArticleCQUPT> detailsArticleCQUPTArrayList) {
         this.detailsArticleCQUPTArrayList = detailsArticleCQUPTArrayList;
         inflater = LayoutInflater.from(app.getContext());
@@ -46,7 +60,7 @@ public class RecyclerViewDetailsCQUPTAdapter extends RecyclerView.Adapter<Recycl
 
     @Override
     public void onBindViewHolder(RecyclerViewDetailsCQUPTAdapter.DetailsCQUPTViewHolder holder, int position) {
-        DetailsArticleCQUPT detailsArticleCQUPT = detailsArticleCQUPTArrayList.get(position);
+        final DetailsArticleCQUPT detailsArticleCQUPT = detailsArticleCQUPTArrayList.get(position);
         if(detailsArticleCQUPT!=null) {
             switch (detailsArticleCQUPT.getType()) {
                 case 0:
@@ -60,6 +74,41 @@ public class RecyclerViewDetailsCQUPTAdapter extends RecyclerView.Adapter<Recycl
                     break;
                 case 3:
                     holder.textView.setText(detailsArticleCQUPT.getDocument().getDocument());
+                    holder.textView.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            path = "jobClient/";
+                            fileName = detailsArticleCQUPT.getDocument().getDocument();
+                            url = detailsArticleCQUPT.getDocument().getDocumentUrl();
+                            new DownLoadAsyncTask().execute();
+//                            HttpUtils http = new HttpUtils();
+//                            HttpHandler handler = http.download(url,
+//                                    path+fileName,
+//                                    true, // 如果目标文件存在，接着未完成的部分继续下载。服务器不支持RANGE时将从新下载。
+//                                    true, // 如果从请求返回信息中获取到文件名，下载完成后自动重命名。
+//                                    new RequestCallBack<File>() {
+//
+//                                        @Override
+//                                        public void onStart() {
+//                                        }
+//
+//                                        @Override
+//                                        public void onLoading(long total, long current, boolean isUploading) {
+//                                        }
+//
+//                                        @Override
+//                                        public void onSuccess(ResponseInfo<File> responseInfo) {
+//                                            Toast.makeText(app.getContext(), "下载成功！", Toast.LENGTH_SHORT).show();
+//                                        }
+//
+//                                        @Override
+//                                        public void onFailure(HttpException error, String msg) {
+//                                            Toast.makeText(app.getContext(), "下载失败！", Toast.LENGTH_SHORT).show();
+//                                        }
+//                                    });
+                        }
+
+                    });
                     break;
             }
         }
@@ -84,6 +133,32 @@ public class RecyclerViewDetailsCQUPTAdapter extends RecyclerView.Adapter<Recycl
                 return 3;
         }
         return -1;
+    }
+
+    class DownLoadAsyncTask extends AsyncTask <String,Void,Integer>{{}
+
+        @Override
+        protected Integer doInBackground(String... strings) {
+            HttpDownloader httpDownLoader=new HttpDownloader();
+            int result=httpDownLoader.downfile(url, path, fileName);
+
+            return result;
+        }
+
+        @Override
+        protected void onPostExecute(Integer result) {
+            super.onPostExecute(result);
+            if(result==0)
+            {
+                Toast.makeText(app.getContext(), "下载成功！", Toast.LENGTH_SHORT).show();
+            }
+            else if(result==1) {
+                Toast.makeText(app.getContext(), "已有文件！", Toast.LENGTH_SHORT).show();
+            }
+            else if(result==-1){
+                Toast.makeText(app.getContext(), "下载失败！", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     class DetailsCQUPTViewHolder extends RecyclerView.ViewHolder {

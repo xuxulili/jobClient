@@ -1,25 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/na_frame"
     android:layout_width="match_parent"
     android:layout_height="192dp"
-    android:background="?attr/colorPrimaryDark"
-    android:padding="16dp"
-    android:theme="@style/ThemeOverlay.AppCompat.Dark"
-    android:orientation="vertical"
-    android:gravity="bottom">
-    <de.hdodenhof.circleimageview.CircleImageView
-        android:layout_width="125dp"
-        android:layout_height="125dp"
-        android:layout_gravity="center"
-        android:scaleType="centerCrop"
-        android:src="@mipmap/datatool3" />
-    <TextView
+    android:background="?attr/colorPrimaryDark">
+    <!--android:scaleType="fitXY"可使图片充满-->
+    <ImageView
+        android:id="@+id/na_img"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="15dp"
-        android:text="欢迎使用重邮求职助手"
-        android:gravity="center"
-        android:textAppearance="@style/TextAppearance.AppCompat.Body1"/>
+        android:layout_height="match_parent"
+        android:scaleType="fitXY" />
 
-</LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_marginBottom="5dp"
+            android:gravity="center"
+            android:text="欢迎使用重邮求职助手"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="@color/white" />
+
+    </LinearLayout>
+    <!--<de.hdodenhof.circleimageview.CircleImageView-->
+    <!--android:id="@+id/circle"-->
+    <!--android:layout_width="125dp"-->
+    <!--android:layout_height="125dp"-->
+    <!--android:layout_gravity="center"-->
+    <!--android:scaleType="centerCrop"-->
+    <!--/>-->
+    <!--android:src="@mipmap/datatool3" -->
+
+
+</FrameLayout>

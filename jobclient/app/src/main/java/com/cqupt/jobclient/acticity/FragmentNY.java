@@ -9,6 +9,7 @@ import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -18,7 +19,9 @@ import android.widget.Toast;
 import com.cqupt.jobclient.R;
 import com.cqupt.jobclient.adapter.RecyclerViewNYAdapter;
 import com.cqupt.jobclient.adapter.RecyclerViewNYAdapter;
+import com.cqupt.jobclient.adapter.RecyclerViewSCAdapter;
 import com.cqupt.jobclient.model.MessageItemNY;
+import com.cqupt.jobclient.utils.DB.DataBaseTool_NY;
 import com.cqupt.jobclient.utils.GetData;
 import com.cqupt.jobclient.utils.NetWorkUtil;
 import com.pnikosis.materialishprogress.ProgressWheel;
@@ -39,6 +42,7 @@ public class FragmentNY extends Fragment {
     private boolean hasLoad;
     private RecyclerViewNYAdapter recyclerViewNYAdapter;
     private ProgressWheel progressWheel;
+    private DataBaseTool_NY dataBaseTool_ny;
     @Override
     public void setUserVisibleHint(boolean isVisibleToUser) {
         super.setUserVisibleHint(isVisibleToUser);
@@ -49,6 +53,20 @@ public class FragmentNY extends Fragment {
                 pageLoad = 0;
                 new NYAsyncTask().execute(String.valueOf(pageLoad));
                 hasLoad = true;
+            }else {
+                if(!hasLoad){
+                    messageItemNYList = dataBaseTool_ny.selectAll();
+//                注意此处页面已经初始化，不会出现recyclerView空值的问题，由于先初始化假如在initView中适配
+//                会出现messageItemSCList空值的问题
+                    if(messageItemNYList!=null) {
+                        recyclerViewNYAdapter = new RecyclerViewNYAdapter(getActivity(), messageItemNYList);
+                        recyclerViewNY.setAdapter(recyclerViewNYAdapter);
+                        showProgressWheel(false);
+                    }
+//                Toast.makeText(app.getContext(), "加载缓存数据", Toast.LENGTH_SHORT).show();
+                    hasLoad = true;
+                }
+
             }
         }else {
             isVisible = false;
@@ -57,6 +75,7 @@ public class FragmentNY extends Fragment {
     @Override
     public void onAttach(Activity activity){
         super.onAttach(activity);
+        dataBaseTool_ny = new DataBaseTool_NY(app.getContext());
     }
 
     @Override
@@ -92,6 +111,7 @@ public class FragmentNY extends Fragment {
                     pageLoad = 0;
                     new NYAsyncTask().execute(String.valueOf(pageLoad));
                 } else {
+                    resetSwipeLayout();
                     Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
                 }
             }
@@ -135,10 +155,15 @@ public class FragmentNY extends Fragment {
                         if (layoutManager instanceof LinearLayoutManager) {
                             int lastitem = linearLayoutManager.findLastCompletelyVisibleItemPosition();
                             if (recyclerView.getAdapter().getItemCount() == lastitem + 1) {
-                                pageLoad++;
-                                swipeRefreshLayoutNY.setRefreshing(true);
-                                swipeRefreshLayoutNY.setEnabled(false);
-                                new NYAsyncTask().execute(String.valueOf(pageLoad));
+                                if(NetWorkUtil.isNetWorkConnected(app.getContext())){
+                                    pageLoad++;
+                                    swipeRefreshLayoutNY.setRefreshing(true);
+                                    swipeRefreshLayoutNY.setEnabled(false);
+                                    new NYAsyncTask().execute(String.valueOf(pageLoad));
+                                }else{
+                                    Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
+                                }
+
                             }
                         }
                     }
@@ -149,6 +174,14 @@ public class FragmentNY extends Fragment {
             }
         });
     }
+
+    private void resetSwipeLayout(){
+        if(swipeRefreshLayoutNY.isRefreshing()){
+            swipeRefreshLayoutNY.setRefreshing(false);
+        }
+        swipeRefreshLayoutNY.setEnabled(true);
+    }
+
     //    进度条操作
     private void showProgressWheel(boolean visible) {
         progressWheel.setBarColor(getResources().getColor(R.color.dark_red));
@@ -175,10 +208,12 @@ public class FragmentNY extends Fragment {
         }
 
         @Override
-        protected void onPostExecute(List<MessageItemNY> messageItemNY) {
-            super.onPostExecute(messageItemNY);
-            if(messageItemNY==null||messageItemNY.size()<=0){
+        protected void onPostExecute(List<MessageItemNY> messageItemNYs) {
+            super.onPostExecute(messageItemNYs);
+            if(messageItemNYs==null||messageItemNYs.size()<=0){
                 Toast.makeText(app.getContext(), "数据加载失败", Toast.LENGTH_SHORT).show();
+                showProgressWheel(false);
+                resetSwipeLayout();
 //                待重新获取
                 return;
             }
@@ -186,16 +221,18 @@ public class FragmentNY extends Fragment {
                 if(messageItemNYList!=null){
                     messageItemNYList.clear();
                 }
-
+                dataBaseTool_ny.clear();
                 messageItemNYList = new ArrayList<>();
-                messageItemNYList.addAll(messageItemNY);
+                messageItemNYList.addAll(messageItemNYs);
+                dataBaseTool_ny.addToDB(messageItemNYs);
                 recyclerViewNYAdapter = new RecyclerViewNYAdapter(getActivity(),messageItemNYList);
                 recyclerViewNY.setAdapter(recyclerViewNYAdapter);
                 if(recyclerViewNYAdapter.getItemCount()>0){
                     showProgressWheel(false);
                 }
             }else {
-                messageItemNYList.addAll(messageItemNY);
+                messageItemNYList.addAll(messageItemNYs);
+                dataBaseTool_ny.addToDB(messageItemNYs);
             }
             if(recyclerViewNYAdapter==null){
                 recyclerViewNYAdapter = new RecyclerViewNYAdapter(getActivity(),messageItemNYList);

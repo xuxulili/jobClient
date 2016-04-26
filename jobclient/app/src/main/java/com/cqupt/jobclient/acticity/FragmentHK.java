@@ -19,7 +19,9 @@ import android.widget.Toast;
 import com.cqupt.jobclient.R;
 import com.cqupt.jobclient.adapter.RecyclerViewHKAdapter;
 import com.cqupt.jobclient.adapter.RecyclerViewNYAdapter;
+import com.cqupt.jobclient.adapter.RecyclerViewXDAdapter;
 import com.cqupt.jobclient.model.MessageItemHK;
+import com.cqupt.jobclient.utils.DB.DataBaseTool_HK;
 import com.cqupt.jobclient.utils.GetData;
 import com.cqupt.jobclient.utils.NetWorkUtil;
 import com.pnikosis.materialishprogress.ProgressWheel;
@@ -41,6 +43,7 @@ public class FragmentHK extends Fragment {
     private ArrayList<MessageItemHK> messageItemHKList;
     private RecyclerViewHKAdapter recyclerViewHKAdapter;
     private ProgressWheel progressWheel;
+    private DataBaseTool_HK dataBaseTool_hk;
     @Override
     public void setUserVisibleHint(boolean isVisibleToUser) {
         super.setUserVisibleHint(isVisibleToUser);
@@ -50,6 +53,20 @@ public class FragmentHK extends Fragment {
                 pageLoad = 0;
                 new HKAsyncTask().execute(String.valueOf(pageLoad));
                 hasLoad = true;
+            }else {
+                if(!hasLoad){
+                    messageItemHKList = dataBaseTool_hk.selectAll();
+//                注意此处页面已经初始化，不会出现recyclerView空值的问题，由于先初始化假如在initView中适配
+//                会出现messageItemSCList空值的问题
+                    if(messageItemHKList!=null) {
+                        recyclerViewHKAdapter = new RecyclerViewHKAdapter(getActivity(), messageItemHKList);
+                        recyclerViewHK.setAdapter(recyclerViewHKAdapter);
+                        showProgressWheel(false);
+                    }
+//                Toast.makeText(app.getContext(), "加载缓存数据", Toast.LENGTH_SHORT).show();
+                    hasLoad = true;
+                }
+
             }
         }else {
             isVisible = false;
@@ -59,6 +76,7 @@ public class FragmentHK extends Fragment {
     @Override
     public void onAttach(Activity activity) {
         super.onAttach(activity);
+        dataBaseTool_hk = new DataBaseTool_HK(app.getContext());
     }
 
     @Nullable
@@ -72,6 +90,12 @@ public class FragmentHK extends Fragment {
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         initView();
+    }
+    private void resetSwipeLayout(){
+        if(swipeRefreshLayoutHK.isRefreshing()){
+            swipeRefreshLayoutHK.setRefreshing(false);
+        }
+        swipeRefreshLayoutHK.setEnabled(true);
     }
 
     private void initView() {
@@ -91,6 +115,7 @@ public class FragmentHK extends Fragment {
                     new HKAsyncTask().execute(String.valueOf(pageLoad));
                 } else {
                     Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
+                    resetSwipeLayout();
                 }
             }
         });
@@ -133,10 +158,15 @@ public class FragmentHK extends Fragment {
                         if (layoutManager instanceof LinearLayoutManager) {
                             int lastitem = linearLayoutManager.findLastCompletelyVisibleItemPosition();
                             if (recyclerView.getAdapter().getItemCount() == lastitem + 1) {
-                                pageLoad++;
-                                swipeRefreshLayoutHK.setRefreshing(true);
-                                swipeRefreshLayoutHK.setEnabled(false);
-                                new HKAsyncTask().execute(String.valueOf(pageLoad));
+                                if(NetWorkUtil.isNetWorkConnected(app.getContext())){
+                                    pageLoad++;
+                                    swipeRefreshLayoutHK.setRefreshing(true);
+                                    swipeRefreshLayoutHK.setEnabled(false);
+                                    new HKAsyncTask().execute(String.valueOf(pageLoad));
+                                }else {
+                                    Toast.makeText(app.getContext(), "无网络连接", Toast.LENGTH_SHORT).show();
+                                }
+
                             }
                         }
                     }
@@ -177,6 +207,8 @@ public class FragmentHK extends Fragment {
             super.onPostExecute(messageItemHKs);
             if(messageItemHKs==null||messageItemHKs.size()<=0){
                 Toast.makeText(app.getContext(), "数据加载失败", Toast.LENGTH_SHORT).show();
+                showProgressWheel(false);
+                resetSwipeLayout();
 //                待重新获取
                 return;
             }
@@ -184,8 +216,10 @@ public class FragmentHK extends Fragment {
                 if(messageItemHKList!=null){
                     messageItemHKList.clear();
                 }
+                dataBaseTool_hk.clear();
                 messageItemHKList = new ArrayList<>();
                 messageItemHKList.addAll(messageItemHKs);
+                dataBaseTool_hk.addToDB(messageItemHKs);
                 recyclerViewHKAdapter = new RecyclerViewHKAdapter(getActivity(),messageItemHKList);
                 recyclerViewHK.setAdapter(recyclerViewHKAdapter);
                 if(recyclerViewHKAdapter.getItemCount()>0){
@@ -193,6 +227,7 @@ public class FragmentHK extends Fragment {
                 }
             }else {
                 messageItemHKList.addAll(messageItemHKs);
+                dataBaseTool_hk.addToDB(messageItemHKs);
             }
             if(recyclerViewHKAdapter==null){
                 recyclerViewHKAdapter = new RecyclerViewHKAdapter(getActivity(),messageItemHKList);
